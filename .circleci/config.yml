@@ -253,6 +253,59 @@ jobs:
           command: |
             find . -type f -and '(' -name '*.h' -or -name '*.c' -or -name '*.inc' ')' | xargs clang-format --dry-run --Werror
 
+  check-ASan-tests:
+    docker:
+      - image: cimg/base:2022.12
+    environment:
+      CC: "clang"
+      CXX: "clang++"
+      ASAN_C_FLAGS: "-fsanitize=address -fno-omit-frame-pointer"
+      ASAN_OPTIONS: "detect_stack_use_after_return=1,detect_leaks=1"
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: sudo apt-get update && sudo apt-get install -y clang llvm ninja-build
+      - run:
+          name: Clone and build OpenSSL(3) master with ASan
+          command: |
+            git clone --branch master git://git.openssl.org/openssl.git openssl
+            cd openssl
+            mkdir install
+            ./Configure --debug --openssldir="$PWD/install" --prefix="$PWD/install" enable-asan
+            make -j$(nproc)
+            make install_sw
+            cd ..
+      - run:
+          name: Clone and build liboqs with ASan
+          command: |
+            git clone --depth 1 --branch main https://github.com/open-quantum-safe/liboqs.git liboqs
+            cd liboqs
+            mkdir build install
+            cmake -GNinja -B build \
+                  -DCMAKE_BUILD_TYPE=Debug \
+                  -DOQS_USE_OPENSSL=OFF \
+                  -DCMAKE_C_FLAGS="${ASAN_C_FLAGS}" \
+                  -DCMAKE_EXE_LINKER_FLAGS="${ASAN_C_FLAGS}" \
+                  -DCMAKE_INSTALL_PREFIX="$PWD/install"
+            cmake --build build -j$(nproc)
+            cmake --install build
+            cd ..
+      - run:
+          name: Build oqs-provider with ASan
+          command: |
+            cmake -GNinja -B build \
+                  -DCMAKE_BUILD_TYPE=Debug \
+                  -DOPENSSL_ROOT_DIR="$PWD/openssl/install" \
+                  -Dliboqs_DIR="$PWD/liboqs/install/lib/cmake/liboqs" \
+                  -DCMAKE_C_FLAGS="${ASAN_C_FLAGS}" \
+                  -DCMAKE_EXE_LINKER_FLAGS="${ASAN_C_FLAGS}"
+            cmake --build build -j$(nproc)
+      - run:
+          name: Run tests
+          command: |
+            ctest --test-dir build/ --output-on-failure
+
   trigger-downstream-ci:
     docker:
       - image: cimg/base:2020.01
@@ -278,6 +331,7 @@ workflows:
   build:
     jobs:
       - check-clang-format
+      - check-ASan-tests
       - ubuntu:
           name: ubuntu-focal
           context: openquantumsafe
