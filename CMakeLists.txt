@@ -4,7 +4,7 @@ else()
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 endif()
 project(oqs-provider LANGUAGES C)
-set(OQSPROVIDER_VERSION_TEXT "0.6.1")
+set(OQSPROVIDER_VERSION_TEXT "0.6.2-dev")
 set(CMAKE_C_STANDARD 11)
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -87,6 +87,7 @@ endfunction()
 add_subdirectory(oqsprov)
 
 # Testing
+include(CTest)
 enable_testing()
 add_subdirectory(test)
 

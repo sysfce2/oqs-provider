@@ -20,7 +20,7 @@ jobs:
       image: openquantumsafe/ci-ubuntu-jammy:latest
     env:
       MAKE_PARAMS: "-j 18"
-      LIBOQS_BRANCH: "0.10.1"
+      LIBOQS_BRANCH: "main"
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -80,6 +80,12 @@ jobs:
         with:
           name: oqsprovider-x64
           path: _build/*.deb
+      - name: Verify that the static library is copied to the install directory.
+        run: |
+          OPENSSL_BRANCH=${{ matrix.ossl-branch }} OQSPROV_CMAKE_PARAMS="-DOQS_PROVIDER_BUILD_STATIC=ON" ./scripts/fullbuild.sh -f && \
+          mkdir -p _sysroot/ && \
+          cmake --install _build --prefix _sysroot/ && \
+          stat _sysroot/lib/liboqsprovider.a
 
   asan_linux_intel:
     name: "Security checks"
@@ -118,7 +124,7 @@ jobs:
 
       - name: Clone and build liboqs with ASan
         run: |
-          git clone --depth=1 --branch 0.10.1 https://github.com/open-quantum-safe/liboqs.git liboqs
+          git clone --depth=1 --branch main https://github.com/open-quantum-safe/liboqs.git liboqs
           cd liboqs
           mkdir build install
           cmake -GNinja -B build \
